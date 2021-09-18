@@ -1,7 +1,7 @@
 # NYU
-A Collection of Work from my masters program
+## A Collection of Work from my masters program
 
-The_Unsupervised_Learners_DSGA_1001_Final_Project.pdf
+### The_Unsupervised_Learners_DSGA_1001_Final_Project.pdf ###
   Final project completed as a part of the Introduction to Datascience DSGA 1001 class at NYU first semester. This pdf is the write-up.
 * Created models to estimate NYC single unit housing price using open-source data from 2011 to 2018
 * Merged sales, assessment, macroeconomic, and demographic data with Pandas; engineered features
