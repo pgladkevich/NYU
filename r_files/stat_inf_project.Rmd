@@ -1,0 +1,202 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+* * *
+
+## Part 1: Data
+
+This my submission for the final project of Duke's Introduction to Inferrential Statistics https://www.coursera.org/learn/inferential-statistics-intro/home/welcome, Course 2 of the 5 part specializiation "Master Statistics with R". For this project I will be exploring a dataset collected by the GSS from 1972-2012. As described by its website: 
+
+>"The GSS aims to gather data on contemporary American society in order to monitor and explain trends and       constants in attitudes, behaviors, and attributes; to examine the structure and functioning of society in      general as well as the role played by relevant subgroups; to compare the United States to other societies in   order to place American society in comparative perspective and develop cross-national models of human          society; and to make high-quality data easily accessible to scholars, students, policy makers, and others,     with minimal cost and waiting." 
+
+(http://www.norc.org/Research/Projects/Pages/general-social-survey.aspx)
+  
+From the GSS data codebook (http://gss.norc.org/documents/codebook/GSS_Codebook.pdf) it is described that the data was collected since 1972 and that after 1994 the survey was conducted every even year with each observation equivalent to a single respondent's answers. The majority of interviews were face to face, and the rest were either computer assisted or via telephone. From 1972 to 2004 each survey was an independently drawn sample of the English speaking persons age 18 or over, and starting from 2006 Spanish speakers were added. While in actuality the study used disproportionate stratified sampling this is a technique beyond the scope of our course, and for our intents and purposes the GSS utilized RANDOM SAMPLING that is generalizable to the population of the United States.
+
+To reiterate, the GSS conducted a survey were each case is a respondent and not a patient; therefore, the data in this study is self-reported, observational, and THERE IS NO RANDOM ASSIGNMENT of individuals to treatment experiments, so it is NOT POSSIBLE to INFER CAUSATION - only potential association. When performing exploratory analysis it is important to remember that positive attributes of this data may have been over-reported while negative attributes may have been under-reported or left out entirely by the respondents. Likewise for difficult to answer questions respondents may have declined to respond, or have estimated incorrectly.
+
+* * *
+
+## Part 2: Research question
+
+It has been a recent topic in the news that Millenials are "killing cable," and that there has been a gradual shift of television viewing patterns http://www.visualcapitalist.com/chart-netflix-generation/. This has led me to pose the following question:
+> Are there observable trends between the amount of time different generations spend watching tv?  
+
+In order to look at this question I used the defintion of generations as taken from the wikipedia page on the Strauss–Howe generational theory, created by authors William Strauss and Neil Howe, which describes a theorized recurring generation cycle in American history. The generations pertaining to the data set are listed below.
+
+* Lost Generation (1883–1900)
+* G.I. Generation (1901–1924)
+* Silent Generation (1925–1942)
+* Baby Boom Generation (1943–1960)
+* Generation X (1961–1981)
+* Millennial Generation (1982–2004)
+https://en.wikipedia.org/wiki/Strauss%E2%80%93Howe_generational_theory
+
+To perform this search I will first use the variables YEAR (GSS YEAR FOR THIS RESPONDENT; Data type: numeric), and AGE (AGE OF RESPONDENT,Data type: numeric) to create a variable called BIRTH_YEAR. Because Age has a cutoff at 89 with any value above being labeled 89 I will be assuming that the percentage of respondent's who are older than 89 is small enough to still use methodology to create the new variable. Then I will sort the respondents into the above generations and use this to perform exploratory and inferrential data analysis in relation to the hours of tv watched with TVHOUR(HOURS PER DAY WATCHING TV; Data type: numeric). 
+
+* * *
+
+## Part 3: Exploratory data analysis
+>Are there observable trends between the amount of time different generations spend watching tv?
+
+To begin I need to select the three relevant variables and clean the data to exclude the respondents who did not have answers for these variables, so I will create a cleaned version of the gss dataframe. Additionally, I will look at the spread of ages via a histogram.
+```{r}
+obs_data <- gss %>%
+  select(age,tvhours, year) %>%
+  filter(tvhours <= 16) %>%
+  na.omit()
+
+table(obs_data$age)
+table(obs_data$tvhours)
+table(obs_data$year)
+
+ggplot(data=obs_data, aes(x=age)) + geom_histogram(binwidth = 5) + ggtitle("Histogram of respondent's age")
+```
+
+Because there are only 24 hours in a day and factoring in sleep and work/other duties I decided to filter out any responses for tvhours that were over 16 hours. Notable from the tables depicting the variables there is an absense of any years before 1975, so likely hours of tv watched was not asked in the early years of the survey. The histogram of the respondent's age is skewed to the right, which is logical considering the proportion of respondent's that are still alive will decrease over time. Additionally, it looks as though the percentage of the population above 89 is low enough that it warrants binning into 89 so my assumption in birth year calculations below applies. 
+
+```{r}
+obs_data <- obs_data %>%
+  group_by(age,year) %>%
+  mutate(birth_year = year-age)
+dim(obs_data)
+
+ggplot(data=obs_data, aes(x=birth_year)) + geom_histogram(binwidth = 5) + ggtitle("Histogram of respondent's birth year")
+  
+```
+
+In the above calculations I have created a new variable called birth_year that will be useful for creating the aforementioned generations. The histogram of of the birth year has a slight left skew, which may be due to generational differences in outlook on public surveys or availability/methodology of the survey. Below is the creation of the categorical variable generations based off of the calculated variable birth_year and the age ranges that were taken from the wikipedia page. 
+
+```{r}
+gen_ranges = c(1883,1900,1925,1943,1961,1982,2004)
+gen_labels = c("Lost Generation","G.I. Generation","Silent Generation","Baby Boom Generation","Generation X","Millennials")
+
+obs_data$generations <- cut(obs_data$birth_year,breaks=gen_ranges, right=FALSE, labels=gen_labels)
+
+gen_table = table(obs_data$generations)
+gen_table
+prop.table(gen_table)
+
+
+```
+From the table and the proportions table of the categorical variable generations it is clear that the Lost Gneration and Millenials are a minorty percentage of the data set; however, their numbers are still large enough to be a signficant sample. Below is a histogram plot of the reported hours of tv watched daily by each of the generations.
+```{r}
+ggplot(data=obs_data,aes(x=tvhours)) + geom_histogram(bins = 20)+ facet_wrap(~generations) 
+```
+
+In the graphs there is an error in the R ggplot format which causes the bar values of 0,1,2 to clump and for there to be a space between 4,5 hours of tv watched. This is not indicative of an absence of 4hours of tv watched daily for the various generations. For all of the graphs depicted it is apparent that there is a rightward skew of the data, meaning that the means will be shifted slightly. From the graphs depicted it seems that the Lost Generation has less outliers with large portions of tvhours watched. Millenials also seem to have less outliers but it is difficult to tell without performing inference to analyze the data.  
+
+* * *
+
+## Part 4: Inference
+
+> Are there observable trends between the amount of time different generations spend watching tv?
+
+>H0: The hours of television watched by the population is the same across different generations. 
+
+>HA: The hours of television watched by the population is different across at least one of the generations.
+
+Because the variables of tvhours and generations are continous and catgeogrical, we will use the ANOVA (analysis of variance) methodology to compare the two. This single hypothesis test will compare the mean value of tvhours watched is the same across the different generations. As taken from our textbook:
+"Generally we must check three conditions on the data before performing ANOVA:"
+
+* the observations are independent within and across groups,
+* the data within each group are nearly normal, and
+* the variability across the groups is about equal.
+
+In regards to independence, the survey responses are taken via random sampling, and they certainly make up less than 10% of the total US population. In order to look at if the data within each group is nearl normal the quantile-quantile plots were constructed below. 
+
+```{r}
+
+# 6 graphs in 2 rows
+#par can be used to set or query graphical parameters
+#With the par( ) function, you can include the option mfrow=c(nrows, ncols) to create a matrix of nrows x ncols plots that are filled in by row
+par(mfrow = c(2,3))
+
+# Using a for loop iterate on 4 groups and graph using qqnorm to create a QQ plot to test normality. Then use qqline in order to draw the quantile theoretical line which passes through the first and third quartile
+
+for (i in 1:6) {
+  single_gen = obs_data %>% filter(generations == gen_labels[i])  
+  qqnorm(single_gen$tvhours, main=gen_labels[i])
+  qqline(single_gen$tvhours)
+}
+```
+
+The quantile-quantile plots do not closely follow the plotted theoretical quantile line, especially in the upper and lower portions of the distribution which mirrors the histograms of the generations that we plotted previously. However, due to the large sample size of each of the generations this is not a substantial concern and we can relax this condition so long as the variance between the groups is about equal. The boxplot graph created below will help us confirm this condition.
+
+```{r}
+#set the margins of the graph to fit the longer names of the generations
+par (mar=c(8,4,0,0) +2.0)
+#create the boxplot graph itself
+boxplot(obs_data$tvhours ~ obs_data$generations,
+             las=2,main="Hours of TV watched by generation",
+             col=rainbow(7))
+```
+
+Interestingly it appears that the medians of the last three generations are lower than those of the first three. Additionally, from the distributions in the side by side box-plots we can tell that the variability varies a bit between the GI. Generation and the Silent Generation relative to the rest of the generations. This will likely skew our ANOVA calculations as they are increasingly affected by outliers; however, this course has not covered more advanced statistical methods of analyzing means across multiple groups so we shall proceed as if this is not the case. Below is the anova calculation.
+
+```{r}
+anova(lm(tvhours ~ generations, data=obs_data))
+```
+
+The F-statistic value is ~89 and the p-value is ~0 so from this we have evidence that at least one pair of the generations has a difference in the average mean hours of tv watched daily that exceeds the natural variance of sampling. In order to identify this pair(s) we could perform a two-sample t-test to test for differences in each possible pair of groups; however, when we run so many tests the Type 1 Error rate (the inccorrect rejection of the null hypothesis) increases. In order to resolve this issue we will used a modified signficance level via the Bonferroni correction where with k groups we perform K comparisons:
+
+* K = k(k-1)/2
+* K = 6(5)/2 = 30/2 = 15
+* α* = α/K = .05/15 = .0033̅
+
+```{r}
+pairwise.t.test(obs_data$tvhours, obs_data$generations, p.adj = "bonf")
+```
+
+In this table the significantly different values are those that are below the caluclated α* of .0033̅. Interestingly mean hours of tv watched by the G.I. and Silent generations are different from everyone except for each other, but we have to take into account that this may be due to the slight difference in variations between these groups and the rest.  
+
+An interesting consideration is that Television was invented in 1927 but in 1947 only a few thousand US homes have it. By 1955 50% of homes have it, and by late 1990s 98% percent of homes have it. 
+https://www.nyu.edu/classes/stephens/History%20of%20Television%20page.htm 
+
+I decided it might be interesting to look at the difference between Silent gen and Millenials because that would be the comparison between those who grew up in their teens when television was first getting popular, and those who grew up at the height of its peak in popularity. In order to perform this inferential analysis I had to filter out the other generation's observations before creating an inference graph. 
+
+```{r}
+obs_data_2 <- gss %>%
+  select(age,tvhours, year) %>%
+  filter(tvhours <= 16) %>%
+  na.omit()
+
+obs_data_2 <- obs_data_2 %>%
+  group_by(age,year) %>%
+  mutate(birth_year = year-age) %>%
+  filter(birth_year >= 1925 && birth_year <=1943 | birth_year >= 1982) 
+
+gen_ranges_2 = c(1925,1982,2004)
+gen_labels_2 = c("Silent Generation","Millennials")
+
+obs_data_2$generations <- cut(obs_data_2$birth_year,breaks=gen_ranges_2, right=FALSE, labels=gen_labels_2)
+
+inference(y=tvhours, x=generations, data=obs_data_2, statistic="mean", type="ci", conf_level = 0.95, method="theoretical")
+```
+
+The data from this graph additionally provides evidence that there is a difference in mean hours of tv watched daily between the Silent and Millenial generation. From this calculation we are 95% confident that the difference is between (0.1016 , 0.4201), and it appears that on average Millenials watch TV for less time.
+
+In summarry although the conditions were not fully fullfilled for performing an ANOVA analysis, it does appear as there is some evidence across various methods that there are generational differences in the average number of hours of tv watched. Further exploratory data analysis with more advanced methodology, analyzing additional data from further years of GSS surveys, or an experimental trial would be needed to quantify and confirm the potentially observed association. 
+

@@ -1,0 +1,223 @@
+---
+title: "Exploratory analysis of BRFSS(2013) data - By Pavel Gladkevich, 2018"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+editor_options: 
+  chunk_output_type: console
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+* * *
+
+## Part 1: Data
+  This my submission for the final project of Duke's Introduction to Probabilty and Data (https://www.coursera.org/learn/probability-intro/home/welcome), Course 1 of the 5 part specializiation "Master Statistics with R". For this project I will be exploring a dataset collected by the BRFSS from 2013. As described by its website(https://www.cdc.gov/brfss/about/index.htm) the Behavioral Risk Factor Surveillance System (BRFSS) is: "... the nation's premier system of health-related telephone surveys that collect state data about U.S. residents regarding their health-related risk behaviors, chronic health conditions, and use of preventive services. Established in 1984 with 15 states, BRFSS now collects data in all 50 states as well as the District of Columbia and three U.S. territories. BRFSS completes more than 400,000 adult interviews each year, making it the largest continuously conducted health survey system in the world."
+  
+  According to the Since 2011 the method of data collection has been landline telephone and cellular telephone-based surveys. For cell surveys the interviewers collect data from those who reside either in a private residence or college housing and were 18 years or older.
+  
+  The BRFSS utilized disproportionate stratified sampling (DSS) for 51 of the states in conjunction with weighting, and simple random sampling for Guam and Puerto Rico; however, the discussion of this is outside the scope of this course. For the purpose of this report the random sampling of phone numbers ensures the data is generalizable to the US population.
+  
+  Since the data in this study is self-reported, observational, and there is no random assignment of individuals to treatments experiments, it is not possible to infer causation - only potential association.
+  
+> There are several potential concerns for bias: 
+
+1. Due to the lengthy nature of the survey there are 58,000 interviews that were not fully completed potential skewing potential interpretations of data. (var = dispcode) 
+2. The structuring of questions in surveys can play a vast role in determing the outcome of the data by influencing the answers of respondents, and in this case the tone of the interviewer could have a potentially large effect as well. 
+3. The under-representation of college students in college housing. The variable cclghous states that only about 1000 students live in college housing.
+
+* * *
+
+## Part 2: Research questions
+
+**Research question 1:**
+
+>Does heavy smoking have a possitive association with impaired memory? 
+
+Smoking has been throughly documented as increasing the risk of developing lung cancer, but there are still many associations left to be explored. From the Journal of Formosan Medical Association (http://www.jfma-online.com/article/S0929-6646(12)00118-0/fulltext) there is an article that is looking into if "Cigarette smoking might impair memory and sleep quality". I chose to focus on if there is a potential association between heavy cigarrete smoking and memory impairment in the overall American population. 
+
+Analysis performed with the following variables (NA ommitted):
+1. decide - Difficulty Concentrating Or Remembering (categorical, "Yes", "No")
+2. X_age_g - Imputed Age In Six Groups (categorical,"18-24","25-34","35-44","45-54","55-64","65&up")
+3. X_smoker3 - Computed Smoking Status(categorical, "Everyday smoker", "Someday smoker", "Former smoker", "Non-smoker")
+  
+**Research question 2:**
+
+>Is there a relationship between being overweight and having arthritis?
+
+Obesity is a very serious medical condition that causes a multitude of risk factors. According to the Center of Disease Control Obesity is a modifiable risk factor for certain types of arthritis (https://www.cdc.gov/arthritis/basics/risk-factors.html). I wanted to explore if this relationship held true in our data set. One measure doctor's use to screen for obesity is the body mass index (BMI) (https://www.nhlbi.nih.gov/health-topics/overweight-and-obesity). Thus, using this calculated value and the reported diagnosis of arthritis I will assess the potential positive association in the American population.
+
+Analysis performed with the following variables (NA ommitted):
+1. X_bmi5 - Computed Body Mass Index (continuous, 1-9999 [2 implied decimal places])
+2. X_age_g - Imputed Age In Six Groups (categorical,"18-24","25-34","35-44","45-54","55-64","65&up")
+3. havarth3 - Told Have Arthritis (categorical, "Yes", "No")
+  
+**Research question 3:**
+
+>Is there a seasonal effect on excercise? Are there statewide differences?
+
+Personally I have frequently found that I can't seem to make it to the gym nearly as often during the winter, and that my resultant mood sometimes suffers. In a much more serious version of this some people suffer from Seasonal Affective Disorder (SAD) which is serious depressive condition.  (https://www.nimh.nih.gov/health/topics/seasonal-affective-disorder/index.shtml) I wanted to see if there were any seasonal effects on the amount people excercised in America, whether that be due to SAD, physical causes such as snow, or other unseen variables.
+
+Analysis performed with the following variables (NA ommitted):
+1. pa1min_ - Minutes Of Total Physical Activity Per Week (continuous, [0], [1 - 99999])
+2. iyear - Interview Year (categorical, "2013", "2014")
+3. imonth - Interview Month (categorical, January-December individually)
+4. exerany2 - Exercise In Past 30 Days (categorical, "Yes", "No")
+5. X_state - State FIPS Code (categorical, Alabama-Puerto Rico)
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Research question 1:**
+*Does heavy smoking have a possitive association with impaired memory?* 
+
+```{r}
+non_smoker_memory <- select(brfss2013,X_smoker3,X_age_g, decide) %>%
+  na.omit() %>%
+    filter (X_smoker3 == "Never smoked")
+
+nsm_table <- table(non_smoker_memory$decide, non_smoker_memory$X_age_g)
+nsm_prop_table <- prop.table(nsm_table, 2)
+
+dim(non_smoker_memory)
+nsm_table
+nsm_prop_table
+```
+
+There are 260,409 respondents who have never smoked between the 6 age groups, with what appears to be a majority of older respondents. There appears to be a an upward trend of of respondents. This should be taken into consideration when assessing the data. The proportions calculated for each age group sum up to one with Yes representing self-evaluated memory impairment. Below is the visualization of proportion calculations.
+
+```{r}
+nsm <- non_smoker_memory %>%
+  group_by(X_age_g,decide) %>%
+  summarise(n = n()) %>%
+  mutate(pct_total = n/sum(n))
+
+nsm_bar <- ggplot(nsm, aes(x=X_age_g,y=pct_total, fill=decide)) +   
+  geom_bar(position = position_fill(reverse=TRUE), stat='identity', width = .75, color="black") +
+  geom_text(aes(label=ifelse(decide == 'Yes', paste0(sprintf("%.0f", pct_total*100),"%"),""), y=(pct_total/2)), color="white") + 
+  scale_y_continuous(labels = scales::percent_format())
+
+nsm_bar + xlab("Age Groups") + ylab("Percentage reported memory problems")
+```
+
+There appears to be an upward trend in reported memory impairment with age. This is logical considering the natural deterioration of the brain. An outlier is the first age group. Perhaps this is because of the lower sampling proportion of this group, or due to the brain not being fully developed amongst adolescents. 
+
+```{r}
+heavy_smoker_memory <- select(brfss2013,X_smoker3,X_age_g, decide) %>%
+  na.omit() %>%
+    filter (X_smoker3 == "Current smoker - now smokes every day")
+hsm_table <- table(heavy_smoker_memory$decide, heavy_smoker_memory$X_age_g)
+hsm_prop_table <- prop.table(hsm_table, 2)
+
+dim(heavy_smoker_memory)
+hsm_table
+hsm_prop_table
+```
+
+There are 54,866 heavy smokers who have smoked at least 100 cigarretes and smoke every day. Interestingly the upward trend of respondents from the non-smoker data set again appears here with the exception of the 65&up group. Below is a visualization of proportions.
+
+
+```{r}
+hs <- heavy_smoker_memory %>%
+  group_by(X_age_g,decide) %>%
+  summarise(n = n()) %>%
+  mutate(pct_total = n/sum(n))
+
+hs_bar <- ggplot(hs, aes(x=X_age_g,y=pct_total, fill=decide)) + 
+  geom_bar(position = position_fill(reverse=TRUE), stat='identity', width = .75, color="black") + 
+  geom_text(aes(label=ifelse(decide == 'Yes', paste0(sprintf("%.0f", pct_total*100),"%"),""), 
+                y=(pct_total/2)), color="white") + 
+  scale_y_continuous(labels = scales::percent_format())
+
+hs_bar + xlab("Age Groups") + ylab("Percentage reported memory problems")
+```
+
+There does not appear to be an upward increase in memory impairment related to age in the heavy smoker group; however, across the board the reported percentage is higher. The outlier of 65&up (still higher than non-smoker) could perhaps be explained due to higher deaths of long-term cigarrette smokers with memory impairment. Below is a side by side comparison of explored groups.
+
+```{r}
+combined_memory <- rbind(non_smoker_memory, heavy_smoker_memory)
+g <- ggplot(combined_memory, aes(x=X_age_g, fill=decide)) + geom_bar(position = position_fill(reverse=TRUE), width = .75, color="black") + facet_grid(.~X_smoker3) + ggtitle("Comparison between heavy smokers and non smokers") + theme_bw()
+
+g <- g + xlab("Age Groups") + ylab("Percentage reported memory problems")
+g + scale_y_continuous(labels = scales::percent_format()) + scale_x_discrete(labels = c("18-24","25-34","35-44","45-54","55-64","65&up"))
+
+```
+
+With this preliminary exploratory analysis it seems likely that there is a positive association between heavy ciggarrete smoking and memory impairment. The proportion of memory impaired respondents approximately double or triple with heavy cigarrete use in comparison to non-smokers. To confirm this and determine if the effect is due to the unexplored variable of sleep, or toxins present in the cigarretes, would need to be looked at in further experimental studies. Additionally further exploratory/experimental analysis could be conducted to examine if the oberved trend persists accross the frequency of cigarrete smoking, or if it dissappears when smokeless tobacco products are used.
+
+**Research question 2:**
+*Is there a relationship between being overweight weight and having arthritis?*
+
+```{r}
+bmi_arth_age <- select(brfss2013,X_bmi5,X_age_g,havarth3) %>%
+  na.omit() %>%
+    mutate(bmi=X_bmi5/100)
+dim(bmi_arth_age)
+```
+
+There are 462,456 respondents who answered to questions about weight2, height3, and havarth3 which is great since there is a better chance of generalizability. The formula for calculating BMI is (Weight(kg)/(Height(cm))^2)*10,000. The calculation was already performed by the BRFSS so the value of bmi5 divided by 100 is enough to get it to BMI as seen on BMI charts. Below is a vizualization.
+
+```{r}
+ggplot(data=bmi_arth_age, aes(x=X_age_g, y=bmi, fill=havarth3)) + geom_boxplot() + 
+  ggtitle("BMI and arthritis for different ages") + xlab("Age Groups") + ylab("Caclulated BMI Value ")
+```
+
+A normal healthy weight by the BMI value for this data set is considered to be between 18.5 and 25, while values over 25 and below 30 are overweight, and values equal to or above 30 are obese. On the above boxplot it is clear that across all age groups there is appears to be a positive association betweeen a calculated BMI and having arthritis. Furthermore, the analysis seems to indicate that the heavier the median weight of an age group with arthritis, the greater the difference between the medians of those with and without arthritis. Given that this is observational data based off of self-reported weights and heights, as well as using the debated metric of BMI the findings can not be used to infer causality
+
+**Research question 3:**
+*Is there a seasonal effect on excercise? Are there statewide differences?*
+
+```{r}
+ex_histo <- select(brfss2013,pa1min_,iyear,imonth) %>% na.omit() %>%
+  filter(iyear == "2013") %>%
+  group_by(imonth)
+
+ggplot(ex_histo, aes(x=pa1min_)) + geom_histogram(bins=1000) + coord_cartesian(xlim = c(0, 5000)) +   geom_vline(aes(xintercept=median(pa1min_)), color="red", linetype="dashed", size=1) +
+  geom_vline(aes(xintercept=mean(pa1min_)), color="blue", linetype="dashed", size=1) +
+  xlab("Minutes of physical activity") + ylab("Number of respondents ")
+
+dim(ex_histo)
+```
+
+There are 320,547 respondents who answered how many minutes of physical activity they had in the last week. In the above plotted histogram the values above 5000 have been ommitted as there are 24*60*7=10,080 minutes in a week/2=5,040 minutes of excercise and values above that are most likely anomalies or errors in entry. There is a rightward skew to the distribution, and as expected the mean(blue) is shifted further to the right in comparison to the median(red). Because of the skew the median is a better representative statistic and will be used in the analysis of statewide seasonal physical activity trends below.
+
+```{r}
+seasonal_excercise <- select(brfss2013,imonth,pa1min_,X_state, iyear) %>% na.omit() %>%
+  filter(iyear == "2013") %>%
+  group_by(imonth,X_state) %>%
+  summarise(med_ex=median(pa1min_))
+ggplot(data=seasonal_excercise, aes(x=imonth, y=X_state, fill=med_ex)) + geom_tile() + 
+  xlab("Month") + ylab("State or Territory ") +
+  scale_x_discrete(labels = c("Jan.","Feb.","Mar.","Apr.","May","Jun.", "Jul.","Aug.", "Sep.", "Oct.", "Nov.", "Dec."))
+
+```
+
+The above heatmap uses the median of the physical activity in minutes in each state with values ranging from 150 to 400 in various shades of blue. As a whole it is apparent that there is a trend of decreased physical activity in cold months such as January, February, March, November, and December. Additionally it appears that certain states have lower medians in comparison to others, such as Mississippi or Tennessee, which is logical considering that these states are in known regions of higher health risks. Lastly, since pa1min_ had 168,000 respondents that answered NA I wanted to look at exarany2 and see if the proportion of those who had exercised leisurely in the past 30 days went down in the cold months. The proportion table is shown below. 
+
+```{r}
+sx <- select(brfss2013,imonth,exerany2,iyear) %>% 
+  na.omit() %>%
+  filter(iyear == "2013") 
+sx_table <- table(sx$exerany2, sx$imonth)
+sx_prop_table <- prop.table(sx_table, 2)
+sx_prop_table
+
+```
+
+From these calculations there is clearly a trend with January and July having the lowest and highest proportion of respondents that had any leisure physical activity (unrelated to work). While these findings suggest there is a negative assocation between excercise and colder months there need to be followup experimental studies to determine the nature and full extent of the relationship. Moreover, there can be exploratory analysis conducted that looks at whether mental state is affected seasonally and how strong the relationship is. 
